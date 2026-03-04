@@ -1,0 +1,46 @@
+name: Prisma Migrate (CI)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      RELOADLY_CLIENT_ID: ${{ secrets.RELOADLY_CLIENT_ID }}
+      RELOADLY_CLIENT_SECRET: ${{ secrets.RELOADLY_CLIENT_SECRET }}
+      MTN_MOMO_SUBSCRIPTION_KEY: ${{ secrets.MTN_MOMO_SUBSCRIPTION_KEY }}
+      MTN_MOMO_API_USER: ${{ secrets.MTN_MOMO_API_USER }}
+      MTN_MOMO_API_KEY: ${{ secrets.MTN_MOMO_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run Prisma migrations and seed (apps/api)
+        working-directory: apps/api
+        run: |
+          npm ci
+          npx prisma generate
+          # Create migration files in the runner (non-interactive)
+          npx prisma migrate dev --name init --create-only
+          # Apply migrations to the target database
+          npx prisma migrate deploy
+          # Generate client again (safety)
+          npx prisma generate
+          # Seed DB (if present)
+          if [ -f prisma/seed.ts ]; then npx ts-node prisma/seed.ts; fi

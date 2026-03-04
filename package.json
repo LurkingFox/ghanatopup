@@ -1,0 +1,12 @@
+{
+  "name": "ghanatopup",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "npm install",
+    "dev": "echo \"Run individual packages' dev scripts (see apps/api)\""
+  }
+}

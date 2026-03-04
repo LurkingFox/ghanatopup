@@ -1,0 +1,21 @@
+{
+  "name": "mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "^55.0.4",
+    "fastify": "5.7.4",
+    "react": "18.2.0",
+    "react-native": "0.71.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

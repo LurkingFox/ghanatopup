@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "GhanaTopUp",
+    "slug": "ghanatopup",
+    "platforms": ["ios", "android", "web"],
+    "version": "1.0.0",
+    "sdkVersion": "48.0.0"
+  }
+}

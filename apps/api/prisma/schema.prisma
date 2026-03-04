@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // directUrl is used by Prisma Migrate to connect without pooling
+  // If you only have a single connection string from Supabase, set
+  // DIRECT_URL equal to DATABASE_URL in your environment.
+  directUrl = env("DIRECT_URL")
+}
+
+enum Network {
+  MTN
+  TELECEL
+  AIRTELTIGO
+}
+
+enum TransactionType {
+  AIRTIME
+  DATA
+}
+
+enum TransactionStatus {
+  INITIATED
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  DELIVERING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id             String        @id @default(uuid())
+  phone          String        @unique
+  displayName    String?
+  loyaltyPoints  Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transactions   Transaction[]
+  beneficiaries  Beneficiary[]
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+  recipientNumber String
+  network         Network
+  type            TransactionType
+  bundleId        String?
+  amountGhs       Decimal           @db.Decimal(10, 2)
+  paymentRef      String?
+  deliveryRef     String?
+  status          TransactionStatus @default(INITIATED)
+  failureReason   String?
+  createdAt       DateTime          @default(now())
+  completedAt     DateTime?
+}
+
+model Beneficiary {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  phone     String
+  network   Network
+  createdAt DateTime @default(now())
+}
