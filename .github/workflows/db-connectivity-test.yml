@@ -56,17 +56,6 @@ PY
         run: |
           pg_isready -h "${{ steps.parse.outputs.host }}" -p "${{ steps.parse.outputs.port }}" || true
 
-      - name: Optional psql list databases (auth test)
+      - name: Note: psql test removed
         run: |
-          # This will attempt to connect using credentials in DATABASE_URL and list DBs; output masked
-          PGPASSWORD=$(python - <<'PY'
-import urllib.parse,os
-u=os.environ.get('DATABASE_URL','')
-if u:
-    p=urllib.parse.urlparse(u)
-    pw=p.password or ''
-    print(pw)
-else:
-    print('')
-PY
-) psql "${{ secrets.DATABASE_URL }}" -c "\l" || true
+          echo "psql tests removed — this workflow only checks TCP connectivity and pg_isready."

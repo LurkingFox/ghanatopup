@@ -11,5 +11,5 @@ Structure:
 Next steps:
 
 - Install dependencies in each package
-- Implement authentication, Prisma schema, and integrations
+- Implement authentication, DB schema, and integrations
 
