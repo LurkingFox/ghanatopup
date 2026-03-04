@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { supabase, supabaseAuth } from "./middleware/supabaseAuth";
 import webhooksRoutes from "./routes/webhooks";
+import transactionsRoutes from "./routes/transactions";
 import { z } from "zod";
 
 const server = Fastify({ logger: true });
@@ -76,3 +77,4 @@ server.addHook('preHandler', (request, _reply, done) => {
 });
 
 server.register(webhooksRoutes);
+server.register(transactionsRoutes);
