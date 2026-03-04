@@ -32,7 +32,6 @@ jobs:
         run: |
           npm ci
           npx prisma generate
-          npx prisma migrate dev --name init --create-only
           npx prisma migrate deploy
           npx prisma generate
           if [ -f prisma/seed.ts ]; then npx ts-node prisma/seed.ts; fi

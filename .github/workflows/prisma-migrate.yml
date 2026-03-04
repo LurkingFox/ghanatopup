@@ -36,9 +36,7 @@ jobs:
         run: |
           npm ci
           npx prisma generate
-          # Create migration files in the runner (non-interactive)
-          npx prisma migrate dev --name init --create-only
-          # Apply migrations to the target database
+          # Apply migrations to the target database (skip local create-only step)
           npx prisma migrate deploy
           # Generate client again (safety)
           npx prisma generate
