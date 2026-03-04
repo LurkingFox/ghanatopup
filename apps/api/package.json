@@ -7,7 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p .",
     "start": "node dist/server.js",
-    "migrate:psql": "psql \"$DATABASE_URL\" -f supabase/migration_supabase.sql"
+    
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.28.0",

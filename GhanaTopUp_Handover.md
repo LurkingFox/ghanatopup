@@ -231,7 +231,7 @@ apps/mobile/
 
 ## 5. Database Schema
 
-The SQL migration in `apps/api/supabase/migration_supabase.sql` is the source of truth for the database. Apply it manually via the Supabase Dashboard → SQL editor, or run it locally with `psql` against your `DATABASE_URL`.
+The SQL migration in `apps/api/supabase/migration_supabase.sql` is the source of truth for the database. Apply it manually via the Supabase Dashboard → SQL editor. Do not run migrations via `psql` or CI — always use the SQL editor and keep the SQL file updated with any schema changes.
 ### 5.1 `users`
 
 | Column | Type | Notes |
@@ -415,9 +415,7 @@ Create a `.env` file in `apps/api/`. **Never commit this to Git** — it is in `
 2. Install dependencies: `cd ghanatopup && npm install` (installs all workspaces)
 3. Copy environment file: `cp apps/api/.env.example apps/api/.env` and fill in your keys
 4. Start local Redis: `docker compose up -d` (uses `docker-compose.yml` in repo root)
-5. Apply database schema: run the SQL migration at `apps/api/supabase/migration_supabase.sql`.
-  - Option A (Supabase SQL editor): Open your Supabase project → SQL editor → New query → paste `apps/api/supabase/migration_supabase.sql` and Run.
-  - Option B (psql): `cd apps/api && psql "$DATABASE_URL" -f supabase/migration_supabase.sql`
+5. Apply database schema: run the SQL migration at `apps/api/supabase/migration_supabase.sql` via the Supabase Dashboard → SQL editor (always apply schema changes manually in the dashboard and update the SQL file in the repo).
 6. (Optional) Seed data is included in the same SQL file — no separate seed step required.
 8. Start the API server: `npm run dev` (runs on http://localhost:3000)
 9. Start the BullMQ worker: `npm run worker` (in a separate terminal)
@@ -462,7 +460,7 @@ volumes:
 
 ### 10.1 Why This Stack Works So Well With Copilot
 
-- **Manual SQL migrations** with the Supabase SQL editor or `psql` provide an explicit, auditable DDL source that integrates with Supabase's tools and CI flows.
+-- **Manual SQL migrations** with the Supabase SQL editor provide an explicit, auditable DDL source that integrates with Supabase's tools and CI flows.
 - **Zod schemas** shared between frontend and backend give Copilot full context of your data shapes
 - **Fastify's route schema declarations** tell Copilot exactly what the request and response look like
 - **TypeScript throughout** means Copilot has type context everywhere — far better suggestions than plain JS
