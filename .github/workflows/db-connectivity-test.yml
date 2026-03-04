@@ -1,0 +1,70 @@
+name: DB Connectivity Test
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test-connection:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y netcat postgresql-client
+
+      - name: Parse DB host and port
+        id: parse
+        run: |
+          echo "DATABASE_URL=${DATABASE_URL}" | sed 's/\r//' > /tmp/dburl
+          # Extract host and port using python to be robust
+          python - <<'PY'
+import os,urllib.parse
+url=os.environ['DATABASE_URL']
+if url.startswith('postgresql://') or url.startswith('postgres://'):
+    # Ensure url parseable
+    p = urllib.parse.urlparse(url)
+    host=p.hostname or ''
+    port=str(p.port or 5432)
+    user=p.username or ''
+    db=p.path.lstrip('/') or ''
+    print(f"::set-output name=host::{host}")
+    print(f"::set-output name=port::{port}")
+    print(f"::set-output name=user::{user}")
+    print(f"::set-output name=db::{db}")
+else:
+    print('::set-output name=host::')
+    print('::set-output name=port::')
+    print('::set-output name=user::')
+    print('::set-output name=db::')
+PY
+
+      - name: Test TCP connectivity (nc)
+        run: |
+          echo "Host: ${{ steps.parse.outputs.host }} Port: ${{ steps.parse.outputs.port }}"
+          nc -vz ${{ steps.parse.outputs.host }} ${{ steps.parse.outputs.port }} || true
+
+      - name: Test pg_isready
+        run: |
+          pg_isready -h "${{ steps.parse.outputs.host }}" -p "${{ steps.parse.outputs.port }}" || true
+
+      - name: Optional psql list databases (auth test)
+        run: |
+          # This will attempt to connect using credentials in DATABASE_URL and list DBs; output masked
+          PGPASSWORD=$(python - <<'PY'
+import urllib.parse,os
+u=os.environ.get('DATABASE_URL','')
+if u:
+    p=urllib.parse.urlparse(u)
+    pw=p.password or ''
+    print(pw)
+else:
+    print('')
+PY
+) psql "${{ secrets.DATABASE_URL }}" -c "\l" || true
