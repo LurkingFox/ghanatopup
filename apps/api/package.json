@@ -7,18 +7,14 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p .",
     "start": "node dist/server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev --name init",
-    "seed": "ts-node prisma/seed.ts"
+    "migrate:psql": "psql \"$DATABASE_URL\" -f supabase/migration_supabase.sql"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0",
     "@supabase/supabase-js": "^2.28.0",
     "fastify": "^5.7.4",
     "zod": "^3.0.0"
   },
   "devDependencies": {
-    "prisma": "^5.0.0",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"

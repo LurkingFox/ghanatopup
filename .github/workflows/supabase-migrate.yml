@@ -1,0 +1,26 @@
+name: Supabase SQL Migrate
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install psql
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Run Supabase SQL migration via psql
+        run: |
+          echo "Applying migration file via psql"
+          psql "${DATABASE_URL}" -f apps/api/supabase/migration_supabase.sql

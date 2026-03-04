@@ -5,7 +5,7 @@
 > Version: 1.0 | Date: March 2026
 > Stack: TypeScript · Fastify · Supabase · Railway · React Native + Expo
 > APIs: Reloadly · MTN MoMo · Telecel Cash · AirtelTigo Money · Africa's Talking
-> Tooling: Prisma · BullMQ · Upstash Redis · Zod · Docker · GitHub Copilot
+> Tooling: SQL migrations · BullMQ · Upstash Redis · Zod · Docker · GitHub Copilot
 
 ---
 
@@ -70,7 +70,7 @@ The architecture separates concerns into four layers: the mobile client, the API
                             │ HTTPS / REST
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                 Fastify API Server (Railway)                     │
-│   Routes → Controllers → Services → Prisma ORM                  │
+│   Routes → Controllers → Services → DB access layer               │
 │   Zod validation · Supabase JWT auth · Webhook handlers         │
 └──────┬──────────────────────────────────────────┬───────────────┘
        │                                          │
@@ -101,7 +101,7 @@ The architecture separates concerns into four layers: the mobile client, the API
 | 7 | Fastify API | Enqueue top-up job in Redis queue | BullMQ producer |
 | 8 | BullMQ Worker | Pick up job → call Reloadly API | BullMQ consumer |
 | 9 | Reloadly | Deliver data bundle to user number | Reloadly REST API |
-| 10 | BullMQ Worker | Update transaction status in DB | Prisma |
+| 10 | BullMQ Worker | Update transaction status in DB | Manual SQL / DB client |
 | 11 | Mobile App | Poll /transactions or receive push → show success | React Query |
 
 ---
@@ -115,8 +115,8 @@ The architecture separates concerns into four layers: the mobile client, the API
 | Runtime | Node.js | 20 LTS | Fast, huge ecosystem, same language as frontend |
 | Framework | Fastify | 4.x | Faster than Express, built-in schema, TypeScript-first |
 | Language | TypeScript | 5.x | Type safety, dramatically improves Copilot suggestions |
-| ORM | Prisma | 5.x | Auto-generates TS types from schema — Copilot loves this |
-| Validation | Zod | 3.x | Runtime schema validation, pairs perfectly with Prisma types |
+| ORM | Manual SQL / optional DB client | N/A | Use SQL migrations and a typed DB client if desired |
+| Validation | Zod | 3.x | Runtime schema validation, pairs well with TypeScript types and manual SQL schemas |
 | Auth | Supabase Auth | 2.x | Phone OTP + JWT out of the box, zero auth boilerplate |
 | Queue | BullMQ | 5.x | Redis-backed job queue for reliable top-up retry logic |
 | Cache/Queue Store | Upstash Redis | Latest | Serverless Redis, free tier, just an API key |
@@ -199,11 +199,11 @@ apps/api/
 │   │   └── topup.worker.ts
 │   ├── queues/           ← BullMQ queue definitions
 │   │   └── topup.queue.ts
-│   ├── db/               ← Prisma client + helpers
+│   ├── db/               ← DB client + helpers
 │   │   └── client.ts
 │   └── middleware/       ← Auth, error handler, logger
-├── prisma/
-│   ├── schema.prisma     ← DB schema (source of truth)
+├── supabase/
+│   ├── migration_supabase.sql     ← DB schema & seed (source of truth)
 │   └── migrations/
 ├── tests/
 ├── Dockerfile
@@ -231,8 +231,7 @@ apps/mobile/
 
 ## 5. Database Schema
 
-The Prisma schema below is the source of truth. Run `npx prisma migrate dev` to apply changes to Supabase.
-
+The SQL migration in `apps/api/supabase/migration_supabase.sql` is the source of truth for the database. Apply it manually via the Supabase Dashboard → SQL editor, or run it locally with `psql` against your `DATABASE_URL`.
 ### 5.1 `users`
 
 | Column | Type | Notes |
@@ -274,77 +273,7 @@ The Prisma schema below is the source of truth. Run `npx prisma migrate dev` to 
 | network | ENUM | MTN \| TELECEL \| AIRTELTIGO |
 | created_at | TIMESTAMPTZ | Auto-set on insert |
 
-### 5.4 Prisma Schema Snippet
-
-```prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-enum Network {
-  MTN
-  TELECEL
-  AIRTELTIGO
-}
-
-enum TransactionType {
-  AIRTIME
-  DATA
-}
-
-enum TransactionStatus {
-  INITIATED
-  PAYMENT_PENDING
-  PAYMENT_CONFIRMED
-  DELIVERING
-  COMPLETED
-  FAILED
-}
-
-model User {
-  id             String        @id @default(uuid())
-  phone          String        @unique
-  displayName    String?
-  loyaltyPoints  Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  transactions   Transaction[]
-  beneficiaries  Beneficiary[]
-}
-
-model Transaction {
-  id              String            @id @default(uuid())
-  userId          String
-  user            User              @relation(fields: [userId], references: [id])
-  recipientNumber String
-  network         Network
-  type            TransactionType
-  bundleId        String?
-  amountGhs       Decimal           @db.Decimal(10, 2)
-  paymentRef      String?
-  deliveryRef     String?
-  status          TransactionStatus @default(INITIATED)
-  failureReason   String?
-  createdAt       DateTime          @default(now())
-  completedAt     DateTime?
-}
-
-model Beneficiary {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  name      String
-  phone     String
-  network   Network
-  createdAt DateTime @default(now())
-}
-```
+(See `apps/api/supabase/migration_supabase.sql` for the full DDL / seed statements.)
 
 ---
 
@@ -445,7 +374,7 @@ Create a `.env` file in `apps/api/`. **Never commit this to Git** — it is in `
 | Variable | Description | Where to get it |
 |---|---|---|
 | `DATABASE_URL` | Supabase PostgreSQL connection string | Supabase dashboard → Settings → Database |
-| `DIRECT_URL` | Direct DB URL (for Prisma migrations) | Supabase dashboard → Settings → Database |
+| `DIRECT_URL` | Direct DB URL (for CLI migrations) | Supabase dashboard → Settings → Database |
 | `SUPABASE_URL` | Your Supabase project URL | Supabase dashboard → Settings → API |
 | `SUPABASE_SERVICE_KEY` | Service role key (full DB access) | Supabase dashboard → Settings → API |
 | `RELOADLY_CLIENT_ID` | Reloadly OAuth client ID | Reloadly developer dashboard |
@@ -486,9 +415,10 @@ Create a `.env` file in `apps/api/`. **Never commit this to Git** — it is in `
 2. Install dependencies: `cd ghanatopup && npm install` (installs all workspaces)
 3. Copy environment file: `cp apps/api/.env.example apps/api/.env` and fill in your keys
 4. Start local Redis: `docker compose up -d` (uses `docker-compose.yml` in repo root)
-5. Generate Prisma client: `cd apps/api && npx prisma generate`
-6. Run database migrations: `npx prisma migrate dev`
-7. Seed the database: `npx prisma db seed` (populates test bundles and network data)
+5. Apply database schema: run the SQL migration at `apps/api/supabase/migration_supabase.sql`.
+  - Option A (Supabase SQL editor): Open your Supabase project → SQL editor → New query → paste `apps/api/supabase/migration_supabase.sql` and Run.
+  - Option B (psql): `cd apps/api && psql "$DATABASE_URL" -f supabase/migration_supabase.sql`
+6. (Optional) Seed data is included in the same SQL file — no separate seed step required.
 8. Start the API server: `npm run dev` (runs on http://localhost:3000)
 9. Start the BullMQ worker: `npm run worker` (in a separate terminal)
 10. Start the mobile app: `cd apps/mobile && npx expo start`
@@ -517,7 +447,7 @@ volumes:
 |---|---|
 | GitHub Copilot | AI code completion — core tool for this project |
 | GitHub Copilot Chat | Chat interface for Copilot — great for explaining code |
-| Prisma | Syntax highlighting and formatting for `.prisma` files |
+| SQL | Syntax highlighting and formatting for SQL files |
 | ESLint | Real-time linting feedback |
 | Prettier | Auto-format on save |
 | Bruno | Test API endpoints without leaving VS Code |
@@ -532,7 +462,7 @@ volumes:
 
 ### 10.1 Why This Stack Works So Well With Copilot
 
-- **Prisma** generates TypeScript types from your DB schema — Copilot reads these and suggests accurate field names in every query
+- **Manual SQL migrations** with the Supabase SQL editor or `psql` provide an explicit, auditable DDL source that integrates with Supabase's tools and CI flows.
 - **Zod schemas** shared between frontend and backend give Copilot full context of your data shapes
 - **Fastify's route schema declarations** tell Copilot exactly what the request and response look like
 - **TypeScript throughout** means Copilot has type context everywhere — far better suggestions than plain JS
@@ -541,7 +471,7 @@ volumes:
 
 - Always write a JSDoc comment above a function before letting Copilot complete it — the comment is your instruction
 - Type the function signature first, then pause — Copilot will often suggest the full implementation
-- In Copilot Chat (`Ctrl+Shift+I`), say "using the Prisma schema I have, write a service to..." for contextual suggestions
+- In Copilot Chat (`Ctrl+Shift+I`), say "using the DB schema I have, write a service to..." for contextual suggestions
 - Use `@workspace` in Copilot Chat to give it context about your entire project structure
 - When writing tests, write the `describe()` and `it()` strings first — Copilot will fill in the test logic
 - For repetitive patterns (e.g. writing a new API route), complete one fully then Copilot learns the pattern for the next
@@ -641,7 +571,7 @@ Complete all of these before switching to production API keys.
 
 | Phase | Milestone | Key Deliverables | Est. Duration |
 |---|---|---|---|
-| 1 | Project Foundation | Monorepo setup, TypeScript config, Prisma schema, DB migrations, Docker compose, env vars | 3–4 days |
+| 1 | Project Foundation | Monorepo setup, TypeScript config, DB schema, DB migrations, Docker compose, env vars | 3–4 days |
 | 2 | Auth | Supabase Auth integration, Phone OTP login flow in API, JWT middleware, Login screen in app | 3–4 days |
 | 3 | Payment Integration | MTN MoMo Collections API, Telecel Cash, AT Money, Webhook handlers, HMAC validation | 5–7 days |
 | 4 | Top-Up Delivery | Reloadly integration, BullMQ queue + worker, retry logic, bundle listing endpoint | 4–5 days |
@@ -663,7 +593,7 @@ Complete all of these before switching to production API keys.
 | MTN MoMo Developer Portal | https://momodeveloper.mtn.com |
 | Africa's Talking Docs | https://developers.africastalking.com |
 | Supabase Docs | https://supabase.com/docs |
-| Prisma Docs | https://www.prisma.io/docs |
+| Postgres / SQL Docs | https://www.postgresql.org/docs/ |
 | Fastify Docs | https://fastify.dev/docs |
 | BullMQ Docs | https://docs.bullmq.io |
 | Upstash Redis | https://upstash.com |
